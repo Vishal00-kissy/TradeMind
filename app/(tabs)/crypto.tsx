@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { COLORS, TYPOGRAPHY, SPACING } from '@/constants/theme';
 import { CryptoCard } from '@/components/CryptoCard';
+import { CryptoSignalCard } from '@/components/CryptoSignalCard';
 import { topCryptos, cryptoHoldings } from '@/services/cryptoData';
+import { getBatchCryptoSignals, type CryptoAISignal } from '@/services/aiCryptoAnalysis';
 import { useAlert } from '@/template';
 
 export default function CryptoScreen() {
@@ -12,6 +14,19 @@ export default function CryptoScreen() {
   const { showAlert } = useAlert();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedTab, setSelectedTab] = useState<'ALL' | 'GAINERS' | 'LOSERS' | 'HOLDINGS'>('ALL');
+  const [aiSignals, setAiSignals] = useState<CryptoAISignal[]>([]);
+  const [loadingSignals, setLoadingSignals] = useState(false);
+  
+  useEffect(() => {
+    loadAISignals();
+  }, []);
+  
+  const loadAISignals = async () => {
+    setLoadingSignals(true);
+    const signals = await getBatchCryptoSignals(topCryptos);
+    setAiSignals(signals);
+    setLoadingSignals(false);
+  };
   
   const getFilteredCryptos = () => {
     let filtered = topCryptos;
@@ -41,6 +56,18 @@ export default function CryptoScreen() {
         { text: 'Cancel', style: 'cancel' },
         { text: 'Buy', style: 'default', onPress: () => showAlert('Demo Mode', 'Connect crypto exchange API to place live orders') },
         { text: 'Sell', style: 'destructive', onPress: () => showAlert('Demo Mode', 'Connect crypto exchange API to place live orders') },
+      ]
+    );
+  };
+  
+  const handleAITrade = (symbol: string, signal: 'BUY' | 'SELL') => {
+    const crypto = topCryptos.find(c => c.symbol === symbol);
+    showAlert(
+      `${signal} ${symbol}`,
+      `AI recommended ${signal} at ₹${crypto?.price.toLocaleString('en-IN')}`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Confirm', style: 'default', onPress: () => showAlert('Demo Mode', 'Connect crypto exchange API to place live orders') },
       ]
     );
   };
@@ -143,6 +170,35 @@ export default function CryptoScreen() {
               <Text style={styles.sectionTitle}>Your Holdings</Text>
             </View>
             
+            {loadingSignals ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={COLORS.accent.primary} />
+                <Text style={styles.loadingText}>Loading AI signals...</Text>
+              </View>
+            ) : aiSignals.length > 0 ? (
+              <>
+                <View style={styles.aiHeader}>
+                  <Ionicons name="sparkles" size={20} color={COLORS.accent.primary} />
+                  <Text style={styles.aiHeaderText}>AI Trading Signals</Text>
+                  <TouchableOpacity onPress={loadAISignals} style={styles.refreshButton}>
+                    <Ionicons name="refresh" size={16} color={COLORS.accent.primary} />
+                  </TouchableOpacity>
+                </View>
+                {aiSignals.map(signal => {
+                  const crypto = topCryptos.find(c => c.symbol === signal.symbol);
+                  if (!crypto) return null;
+                  return (
+                    <CryptoSignalCard
+                      key={signal.symbol}
+                      signal={signal}
+                      currentPrice={crypto.price}
+                      onTrade={handleAITrade}
+                    />
+                  );
+                })}
+              </>
+            ) : null}
+            
             {cryptoHoldings.length === 0 ? (
               <View style={styles.emptyState}>
                 <Ionicons name="wallet-outline" size={64} color={COLORS.text.tertiary} />
@@ -179,6 +235,35 @@ export default function CryptoScreen() {
           </>
         ) : (
           <>
+            {loadingSignals ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={COLORS.accent.primary} />
+                <Text style={styles.loadingText}>Getting AI insights...</Text>
+              </View>
+            ) : aiSignals.length > 0 ? (
+              <>
+                <View style={styles.aiHeader}>
+                  <Ionicons name="sparkles" size={20} color={COLORS.accent.primary} />
+                  <Text style={styles.aiHeaderText}>AI Profit Signals</Text>
+                  <TouchableOpacity onPress={loadAISignals} style={styles.refreshButton}>
+                    <Ionicons name="refresh" size={16} color={COLORS.accent.primary} />
+                  </TouchableOpacity>
+                </View>
+                {aiSignals.map(signal => {
+                  const crypto = topCryptos.find(c => c.symbol === signal.symbol);
+                  if (!crypto) return null;
+                  return (
+                    <CryptoSignalCard
+                      key={signal.symbol}
+                      signal={signal}
+                      currentPrice={crypto.price}
+                      onTrade={handleAITrade}
+                    />
+                  );
+                })}
+              </>
+            ) : null}
+            
             <View style={styles.sectionHeader}>
               <Ionicons name="flame" size={20} color={COLORS.loss} />
               <Text style={styles.sectionTitle}>
@@ -381,5 +466,32 @@ const styles = StyleSheet.create({
   holdingStat: {
     fontSize: TYPOGRAPHY.sizes.xs,
     color: COLORS.text.secondary,
+  },
+  loadingContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: SPACING.xl,
+    gap: SPACING.md,
+  },
+  loadingText: {
+    fontSize: TYPOGRAPHY.sizes.sm,
+    color: COLORS.text.secondary,
+  },
+  aiHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SPACING.sm,
+    marginBottom: SPACING.md,
+  },
+  aiHeaderText: {
+    flex: 1,
+    fontSize: TYPOGRAPHY.sizes.lg,
+    fontWeight: TYPOGRAPHY.weights.bold,
+    color: COLORS.text.primary,
+  },
+  refreshButton: {
+    padding: SPACING.sm,
+    backgroundColor: COLORS.background.tertiary,
+    borderRadius: SPACING.md,
   },
 });
