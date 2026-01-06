@@ -1,15 +1,15 @@
 import { useState, useEffect } from 'react';
-import { OptionChainData, generateOptionChain } from '@/services/optionChain';
+import { OptionChainData, getOptionChain } from '@/services/optionChain';
 
-export function useOptionChain(atmStrike: number) {
+export function useOptionChain(symbol: string = 'NIFTY') {
   const [chainData, setChainData] = useState<OptionChainData[]>([]);
   const [loading, setLoading] = useState(false);
 
   const loadChain = async () => {
     setLoading(true);
     try {
-      const data = generateOptionChain(atmStrike);
-      setChainData(data);
+      const { data } = await getOptionChain(symbol);
+      setChainData(data || []);
     } catch (error) {
       console.error('Error loading option chain:', error);
     } finally {
@@ -19,7 +19,10 @@ export function useOptionChain(atmStrike: number) {
 
   useEffect(() => {
     loadChain();
-  }, [atmStrike]);
+    // Refresh every 10 seconds
+    const interval = setInterval(loadChain, 10000);
+    return () => clearInterval(interval);
+  }, [symbol]);
 
   return {
     chainData,
