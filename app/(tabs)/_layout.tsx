@@ -90,6 +90,15 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="crypto"
+        options={{
+          title: 'Crypto',
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="logo-bitcoin" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
         name="more"
         options={{
           title: 'More',
